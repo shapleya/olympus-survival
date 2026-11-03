@@ -28,13 +28,13 @@ const Input = (() => {
       for (const pid of ['p1', 'p2']) {
         if (!parsed || !parsed[pid]) continue;
         Object.assign(bindings[pid], parsed[pid]);
-        // Move saves that still use the old default movement keys onto the new defaults.
-        const legacy = LEGACY_MOVEMENT_BINDINGS[pid];
-        const unchanged = ['left', 'right', 'up', 'down'].every(a => bindings[pid][a] === legacy[a]);
-        if (unchanged) {
-          for (const a of ['left', 'right', 'up', 'down']) {
-            bindings[pid][a] = DEFAULT_BINDINGS[pid][a];
-          }
+        // Move saves that still match a previous default layout onto the new
+        // defaults. Custom remaps are left alone.
+        const onLegacyDefault = LEGACY_DEFAULT_BINDINGS.some(layout =>
+          ACTIONS.every(a => bindings[pid][a.id] === layout[pid][a.id])
+        );
+        if (onLegacyDefault) {
+          Object.assign(bindings[pid], DEFAULT_BINDINGS[pid]);
           migrated = true;
         }
       }

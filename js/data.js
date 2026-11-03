@@ -680,21 +680,46 @@ const ACTIONS = [
 const DEFAULT_BINDINGS = {
   p1: {
     left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
-    punch: 'KeyF', kick: 'KeyG', s1: 'KeyH', s2: 'KeyR',
-    block: 'KeyT', super: 'KeyY'
+    punch: 'KeyJ', kick: 'KeyK', s1: 'KeyL', s2: 'KeyU',
+    block: 'KeyI', super: 'KeyO'
   },
   p2: {
     left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
-    punch: 'KeyJ', kick: 'KeyK', s1: 'KeyL', s2: 'KeyU',
-    block: 'KeyI', super: 'KeyO'
+    punch: 'KeyF', kick: 'KeyG', s1: 'KeyH', s2: 'KeyR',
+    block: 'KeyT', super: 'KeyY'
   }
 };
 
-// Previous defaults, used to migrate saves made before the movement keys were swapped.
-const LEGACY_MOVEMENT_BINDINGS = {
-  p1: { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
-  p2: { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }
-};
+// Previous default layouts, used to migrate saves made before player 1 and
+// player 2 swapped sides.
+const LEGACY_DEFAULT_BINDINGS = [
+  // Original: player 1 on the left, player 2 on the right.
+  {
+    p1: {
+      left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
+      punch: 'KeyF', kick: 'KeyG', s1: 'KeyH', s2: 'KeyR',
+      block: 'KeyT', super: 'KeyY'
+    },
+    p2: {
+      left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
+      punch: 'KeyJ', kick: 'KeyK', s1: 'KeyL', s2: 'KeyU',
+      block: 'KeyI', super: 'KeyO'
+    }
+  },
+  // Interim: only the movement keys were swapped.
+  {
+    p1: {
+      left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
+      punch: 'KeyF', kick: 'KeyG', s1: 'KeyH', s2: 'KeyR',
+      block: 'KeyT', super: 'KeyY'
+    },
+    p2: {
+      left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
+      punch: 'KeyJ', kick: 'KeyK', s1: 'KeyL', s2: 'KeyU',
+      block: 'KeyI', super: 'KeyO'
+    }
+  }
+];
 
 const KEY_LABELS = {
   ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',

@@ -62,12 +62,12 @@ Rounds are best of three with a 60-second timer. The player with more health win
 | Move right | `→` | `D` |
 | Jump | `↑` | `W` |
 | Crouch | `↓` | `S` |
-| Punch | `F` | `J` |
-| Kick | `G` | `K` |
-| Special 1 | `H` | `L` |
-| Special 2 | `R` | `U` |
-| Block | `T` | `I` |
-| Superpower | `Y` | `O` |
+| Punch | `J` | `F` |
+| Kick | `K` | `G` |
+| Special 1 | `L` | `H` |
+| Special 2 | `U` | `R` |
+| Block | `I` | `T` |
+| Superpower | `O` | `Y` |
 
 `Esc` pauses. `M` toggles sound. Every binding can be changed from the **Controls** screen; bindings and progress are stored in `localStorage`.
 
