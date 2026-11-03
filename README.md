@@ -58,10 +58,10 @@ Rounds are best of three with a 60-second timer. The player with more health win
 
 | Action | Player 1 | Player 2 |
 | --- | --- | --- |
-| Move left | `A` | `←` |
-| Move right | `D` | `→` |
-| Jump | `W` | `↑` |
-| Crouch | `S` | `↓` |
+| Move left | `←` | `A` |
+| Move right | `→` | `D` |
+| Jump | `↑` | `W` |
+| Crouch | `↓` | `S` |
 | Punch | `F` | `J` |
 | Kick | `G` | `K` |
 | Special 1 | `H` | `L` |

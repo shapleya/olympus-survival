@@ -679,15 +679,21 @@ const ACTIONS = [
 
 const DEFAULT_BINDINGS = {
   p1: {
-    left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
+    left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
     punch: 'KeyF', kick: 'KeyG', s1: 'KeyH', s2: 'KeyR',
     block: 'KeyT', super: 'KeyY'
   },
   p2: {
-    left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown',
+    left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
     punch: 'KeyJ', kick: 'KeyK', s1: 'KeyL', s2: 'KeyU',
     block: 'KeyI', super: 'KeyO'
   }
+};
+
+// Previous defaults, used to migrate saves made before the movement keys were swapped.
+const LEGACY_MOVEMENT_BINDINGS = {
+  p1: { left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS' },
+  p2: { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' }
 };
 
 const KEY_LABELS = {

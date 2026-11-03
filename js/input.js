@@ -16,18 +16,31 @@ const Input = (() => {
   let pads = [];
   let anyPressedThisFrame = false;
 
+  function saveBindings() {
+    try { localStorage.setItem('olympus_bindings', JSON.stringify(bindings)); } catch (e) { /* ignore */ }
+  }
+
   try {
     const raw = localStorage.getItem('olympus_bindings');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.p1) Object.assign(bindings.p1, parsed.p1);
-      if (parsed && parsed.p2) Object.assign(bindings.p2, parsed.p2);
+      let migrated = false;
+      for (const pid of ['p1', 'p2']) {
+        if (!parsed || !parsed[pid]) continue;
+        Object.assign(bindings[pid], parsed[pid]);
+        // Move saves that still use the old default movement keys onto the new defaults.
+        const legacy = LEGACY_MOVEMENT_BINDINGS[pid];
+        const unchanged = ['left', 'right', 'up', 'down'].every(a => bindings[pid][a] === legacy[a]);
+        if (unchanged) {
+          for (const a of ['left', 'right', 'up', 'down']) {
+            bindings[pid][a] = DEFAULT_BINDINGS[pid][a];
+          }
+          migrated = true;
+        }
+      }
+      if (migrated) saveBindings();
     }
   } catch (e) { /* ignore */ }
-
-  function saveBindings() {
-    try { localStorage.setItem('olympus_bindings', JSON.stringify(bindings)); } catch (e) { /* ignore */ }
-  }
 
   const GAME_KEYS = new Set([
     'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'Tab',
