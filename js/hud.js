@@ -261,7 +261,7 @@ const HUD = (() => {
       c.globalAlpha = pulse;
       c.font = `bold 12px ${SANS}`;
       c.fillStyle = '#ffe27a';
-      c.fillText('SUPER READY — ' + (side === 0 ? 'Y' : 'O'), x, y);
+      c.fillText('SUPER READY — ' + keyLabel(Input.bindings[side === 0 ? 'p1' : 'p2'].super), x, y);
     } else if (f.meter >= 50) {
       c.globalAlpha = 0.8;
       c.font = `11px ${SANS}`;
