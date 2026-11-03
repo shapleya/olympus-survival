@@ -244,7 +244,7 @@ const Game = {
     f1.update(this.lastDt * scale, in0, f2);
     f2.update(this.lastDt * scale, in1, f1);
 
-    this.resolveBodies(f1, f2);
+    this.resolveBodies(f1, f2, this.lastDt * scale);
 
     // face each other
     for (const f of this.fighters) {
@@ -264,20 +264,33 @@ const Game = {
     this.comboPop = Math.max(0, this.comboPop - dt * 3);
   },
 
-  resolveBodies(a, b) {
+  resolveBodies(a, b, dt) {
     if (!a || !b || a.ko || b.ko) return;
     if (Math.abs(a.y - b.y) > 80) return;
     const minDist = 34 * (a.scale + b.scale) + 26;
-    const dx = b.x - a.x;
-    const d = Math.abs(dx);
-    if (d < minDist && d > 0.001) {
-      const push = (minDist - d) / 2;
-      const dir = Math.sign(dx);
-      a.x -= dir * push;
-      b.x += dir * push;
-      a.x = Math.max(WALL_L, Math.min(WALL_R, a.x));
-      b.x = Math.max(WALL_L, Math.min(WALL_R, b.x));
+    let dx = b.x - a.x;
+    let d = Math.abs(dx);
+    if (d >= minDist) return;
+    let dir = Math.sign(dx);
+    if (d < 0.001) { dir = a.facing || 1; d = 0.001; }
+    // Soft positional separation: resolves small overlaps over a few frames
+    // instead of teleporting the bodies apart, which reads as weight rather
+    // than jitter. Deep overlap (a dash landing on someone) still resolves fully.
+    const overlap = minDist - d;
+    const soft = 1 - Math.exp(-40 * (dt || 1 / 60));
+    const k = Math.max(soft, Math.min(1, overlap / 20));
+    const push = overlap * k * 0.5;
+    a.x -= dir * push;
+    b.x += dir * push;
+    // Transfer a little of the closing velocity so contact feels like contact.
+    const closing = (a.vx - b.vx) * dir;
+    if (closing > 0) {
+      const transfer = Math.min(closing, 180) * 0.18;
+      a.vx -= dir * transfer;
+      b.vx += dir * transfer;
     }
+    a.x = Math.max(WALL_L, Math.min(WALL_R, a.x));
+    b.x = Math.max(WALL_L, Math.min(WALL_R, b.x));
   },
 
   /* ---------------- Entities ---------------- */

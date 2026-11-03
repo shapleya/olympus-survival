@@ -881,7 +881,7 @@ const Render = (() => {
     };
   }
 
-  function getPose(f, t) {
+  function getPose(f, t, opts) {
     const p = makePose();
     const H = 205 * (VIS[f.char.id] ? VIS[f.char.id].scale : 1);
     const v = VIS[f.char.id] || VIS.athena;
@@ -896,14 +896,17 @@ const Render = (() => {
     }
 
     if (st === 'walk' || st === 'dash') {
-      const ph = f.gait || t * 9;
+      const ph = f.gait !== undefined ? f.gait : t * 9;
       const sp = st === 'dash' ? 1.5 : 1;
       p.legB = [Math.sin(ph) * 0.55 * sp - 0.1, 0.25 + Math.max(0, Math.sin(ph)) * 0.4];
       p.legF = [-Math.sin(ph) * 0.55 * sp + 0.1, 0.25 + Math.max(0, -Math.sin(ph)) * 0.4];
       p.armB = [0.42 - Math.sin(ph) * 0.28, 1.45];
       p.armF = [0.55 + Math.sin(ph) * 0.24, 1.35];
       p.bob = Math.abs(Math.sin(ph)) * H * 0.012;
-      p.lean = st === 'dash' ? 0.12 : 0.04;
+      // Lean into the direction of travel; lean back when backpedaling.
+      const travel = clamp((f.vx || 0) * (f.facing || 1) / 320, -1, 1);
+      p.lean = st === 'dash' ? travel * 0.14 : 0.04 + travel * 0.055;
+      p.head = Math.sin(ph * 2) * 0.018;
     }
 
     if (st === 'crouch' || (f.crouching && st !== 'jump' && st !== 'attack' && st !== 'hit')) {
@@ -922,6 +925,7 @@ const Render = (() => {
       p.armB = up ? [0.9, 0.8] : [0.5, 1.2];
       p.armF = up ? [1.1, 0.7] : [0.7, 1.2];
       p.hipOff = H * 0.02;
+      p.lean = clamp((f.vx || 0) * (f.facing || 1) / 1400, -0.1, 0.1);
     }
 
     if (st === 'block') {
@@ -994,7 +998,72 @@ const Render = (() => {
     }
 
     p.gowned = v.gown;
-    return p;
+    return smoothPose(f, p, t, opts);
+  }
+
+  /* ---------------- Pose blending ----------------
+     The pose skeleton is authored per state, so switching state used to
+     snap every limb to a new angle in a single frame. Easing the numeric
+     pose values toward their target gives smooth transitions without
+     touching the gameplay state machine. Attacks use a high rate so they
+     stay crisp; locomotion uses a low rate so steps settle softly. */
+  function clonePose(src) {
+    return {
+      hipOff: src.hipOff, lean: src.lean, bob: src.bob, head: src.head,
+      armB: [src.armB[0], src.armB[1]], armF: [src.armF[0], src.armF[1]],
+      legB: [src.legB[0], src.legB[1]], legF: [src.legF[0], src.legF[1]],
+      weapon: src.weapon, shield: src.shield, spin: src.spin,
+      shadowAlpha: src.shadowAlpha, gowned: src.gowned
+    };
+  }
+
+  function poseRate(state) {
+    switch (state) {
+      case 'idle': return 13;
+      case 'walk': return 17;
+      case 'jump':
+      case 'air': return 15;
+      case 'block': return 21;
+      case 'attack': return 55;
+      case 'special': return 32;
+      case 'hit':
+      case 'stunned': return 42;
+      case 'down':
+      case 'ko': return 24;
+      case 'victory': return 12;
+      default: return 18;
+    }
+  }
+
+  function smoothPose(f, target, t, opts) {
+    if (opts && opts.ghost) return target;
+    if (!f._pose) {
+      f._pose = clonePose(target);
+      f._poseT = t;
+      return f._pose;
+    }
+    const prev = f._poseT === undefined ? t : f._poseT;
+    const dt = Math.min(0.05, Math.max(0, t - prev));
+    f._poseT = t;
+    if (dt <= 0) return f._pose;
+    const out = f._pose;
+    const k = 1 - Math.exp(-poseRate(f.state) * dt);
+    out.hipOff += (target.hipOff - out.hipOff) * k;
+    out.lean += (target.lean - out.lean) * k;
+    out.bob += (target.bob - out.bob) * k;
+    out.head += (target.head - out.head) * k;
+    out.weapon += (target.weapon - out.weapon) * k;
+    out.shield += (target.shield - out.shield) * k;
+    for (const key of ['armB', 'armF', 'legB', 'legF']) {
+      out[key][0] += (target[key][0] - out[key][0]) * k;
+      out[key][1] += (target[key][1] - out[key][1]) * k;
+    }
+    // Rotations and flip transforms are not eased: they are driven by time
+    // directly, and easing them would visibly lag the spin.
+    out.spin = target.spin;
+    out.gowned = target.gowned;
+    out.shadowAlpha = target.shadowAlpha;
+    return out;
   }
 
   function applyAttackPose(p, f, H) {
@@ -2990,7 +3059,7 @@ const Render = (() => {
     const H = 205 * v.scale;
     const bulk = v.bulk;
     const wsc = H / 168;
-    const p = getPose(f, t);
+    const p = getPose(f, t, opts);
     const hip = { x: 0, y: -H * 0.46 + p.hipOff + p.bob, }
     const shoulder = { x: p.lean * H * 0.14, y: -H * 0.79 + p.hipOff * 0.22 + p.bob };
     const headR = H * 0.083;
@@ -3012,26 +3081,34 @@ const Render = (() => {
 
     c.save();
     c.translate(f.x, f.y);
-    // grounded cast shadow: a soft broad ellipse plus a darker contact core
+    // Cast shadow stays on the floor and shrinks/fades with height, so a
+    // jump reads as leaving the ground instead of dragging its shadow along.
     if (!opts.noShadow) {
+      const air = Math.max(0, GROUND_Y - f.y);
+      const lift = Math.min(1, air / 300);
       const sx = H * 0.035;
-      const sh = c.createRadialGradient(sx, 0, 2, sx, 0, H * 0.44);
-      sh.addColorStop(0, 'rgba(0,0,0,0.34)');
-      sh.addColorStop(0.5, 'rgba(0,0,0,0.16)');
+      const sy = air;
+      const scale = 1 - lift * 0.38;
+      const alpha = 1 - lift * 0.6;
+      const sh = c.createRadialGradient(sx, sy, 2, sx, sy, H * 0.44 * scale);
+      sh.addColorStop(0, `rgba(0,0,0,${0.34 * alpha})`);
+      sh.addColorStop(0.5, `rgba(0,0,0,${0.16 * alpha})`);
       sh.addColorStop(1, 'rgba(0,0,0,0)');
       c.fillStyle = sh;
       c.beginPath();
-      c.ellipse(sx, 0, H * 0.46, H * 0.115, 0, 0, Math.PI * 2);
+      c.ellipse(sx, sy, H * 0.46 * scale, H * 0.115 * scale, 0, 0, Math.PI * 2);
       c.fill();
-      const core = c.createRadialGradient(sx, 0, 1, sx, 0, H * 0.2);
-      core.addColorStop(0, 'rgba(0,0,0,0.46)');
+      const core = c.createRadialGradient(sx, sy, 1, sx, sy, H * 0.2 * scale);
+      core.addColorStop(0, `rgba(0,0,0,${0.46 * alpha})`);
       core.addColorStop(1, 'rgba(0,0,0,0)');
       c.fillStyle = core;
       c.beginPath();
-      c.ellipse(sx, 0, H * 0.24, H * 0.05, 0, 0, Math.PI * 2);
+      c.ellipse(sx, sy, H * 0.24 * scale, H * 0.05 * scale, 0, 0, Math.PI * 2);
       c.fill();
     }
-    c.scale(f.facing || 1, 1);
+    // Landing impact squash, anchored at the feet.
+    const squash = Math.min(0.9, f.landSquash || 0);
+    c.scale((f.facing || 1) * (1 + squash * 0.06), 1 - squash * 0.1);
     if (f.ko) {
       const a = Math.min(1.45, (f.koTime || 0) * 2.4);
       c.translate(0, -H * 0.02);

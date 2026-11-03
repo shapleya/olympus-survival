@@ -4,6 +4,30 @@
 
 let FIGHTER_ID = 1;
 
+/* Movement tuning. Distances are in stage pixels; times in seconds. */
+const MOVEMENT = {
+  groundAccel: 2900,     // px/s² while a direction is held
+  groundDecel: 2400,     // px/s² when the direction is released
+  turnAccel: 4400,       // px/s² when reversing (harder push off the ground)
+  airAccel: 1250,        // px/s² of air control
+  gravityRise: 2500,
+  gravityFall: 2750,
+  maxFall: 1750,
+  jumpCutDelay: 0.08,    // let go after this long for a shorter hop
+  jumpCutSpeed: 380,
+  dashTime: 0.18,
+  dashSpeed: 820,
+  dashEndSpeed: 620,
+  gaitPerPixel: 0.039,   // keeps the stride locked to distance travelled
+  walkFootstepSpeed: 60
+};
+
+/* Move `current` toward `target` by at most `maxDelta`. */
+function approach(current, target, maxDelta) {
+  if (current < target) return Math.min(current + maxDelta, target);
+  return Math.max(current - maxDelta, target);
+}
+
 class Fighter {
   constructor(charId, playerIndex, isCPU, game) {
     this.id = FIGHTER_ID++;
@@ -29,6 +53,7 @@ class Fighter {
     this.state = 'idle';
     this.stateTime = 0;
     this.gait = 0;
+    this.gaitX = this.x;
     this.animOffset = Math.random() * 10;
 
     this.attackMove = null;
@@ -67,8 +92,15 @@ class Fighter {
 
     this.dashCd = 0;
     this.dashTime = 0;
+    this.dashDuration = MOVEMENT.dashTime;
     this.dashDir = 1;
+    this.dashTrailT = 0;
+    this.skidCd = 0;
     this.lastTap = { left: -9, right: -9 };
+
+    // Visual-only movement flourishes.
+    this.landSquash = 0;
+    this.lastFootPhase = 0;
 
     this.buffered = null;
 
@@ -147,6 +179,13 @@ class Fighter {
     this.invuln = 0;
     this.blockstunT = 0;
     this.dashTime = 0;
+    this.dashTrailT = 0;
+    this.skidCd = 0;
+    this.landSquash = 0;
+    this.lastFootPhase = 0;
+    this.jumpHeld = false;
+    this.gait = 0;
+    this.gaitX = x;
     this.pendingSpecial = null;
     this.buffered = null;
     this.alpha = 1;
@@ -244,10 +283,18 @@ class Fighter {
   update(dt, input, opponent) {
     this.opponent = opponent;
     this.stateTime += dt;
+    // Advance the walk cycle from the distance actually covered since the
+    // previous frame. This includes body pushes and wall stops, so the feet
+    // stay planted rather than skating.
+    if (this.gaitX === undefined) this.gaitX = this.x;
+    this.gait = (this.gait || 0) + (this.x - this.gaitX) * MOVEMENT.gaitPerPixel;
+    this.gaitX = this.x;
     this.displayHp += (this.hp - this.displayHp) * Math.min(1, dt * 7);
     if (Math.abs(this.displayHp - this.hp) < 0.5) this.displayHp = this.hp;
     this.hitFlash = Math.max(0, this.hitFlash - dt * 3.6);
     this.dashCd = Math.max(0, this.dashCd - dt);
+    this.landSquash = Math.max(0, (this.landSquash || 0) - dt * 7);
+    if (this.skidCd > 0) this.skidCd = Math.max(0, this.skidCd - dt);
     this.superArmor = Math.max(0, this.superArmor - dt);
     this.invuln = Math.max(0, this.invuln - dt);
     if (this.blockstunT > 0) this.blockstunT = Math.max(0, this.blockstunT - dt);
@@ -294,7 +341,7 @@ class Fighter {
     }
     if (this.status.stun) {
       if (this.state !== 'stunned') { this.state = 'stunned'; this.stateTime = 0; }
-      this.vx *= 0.9;
+      this.vx *= Math.exp(-6.3 * dt);
       this.updatePhysics(dt, opponent);
       return;
     }
@@ -318,7 +365,7 @@ class Fighter {
 
     // hitstun / blockstun / knockdown
     if (this.state === 'hit') {
-      this.vx *= 0.965;
+      this.vx *= Math.exp(-2.1 * dt);
       this.updatePhysics(dt, opponent);
       if (this.state !== 'hit') return;
       if (this.grounded() && this.stateTime > 0.05 && this.stateTime > (this.hitstunDur || 0.25)) {
@@ -328,9 +375,16 @@ class Fighter {
     }
 
     if (this.state === 'down') {
-      this.vx *= 0.9;
+      this.vx *= Math.exp(-6.3 * dt);
       this.updatePhysics(dt, opponent);
       if (this.stateTime > 0.45) this.toIdle();
+      return;
+    }
+
+    // A dash is a committed burst: it runs for its full duration instead of
+    // being overwritten by the held direction on the very next frame.
+    if (this.state === 'dash') {
+      this.updatePhysics(dt, opponent);
       return;
     }
 
@@ -350,6 +404,7 @@ class Fighter {
     if (this.state !== 'block') this.blocking = false;
     this.handleInput(dt, inp, opponent);
     this.updatePhysics(dt, opponent);
+    this.updateFootsteps();
   }
 
   updateStatuses(dt) {
@@ -397,7 +452,10 @@ class Fighter {
 
   updatePhysics(dt, opponent) {
     if (!this.grounded()) {
-      this.vy += 2500 * dt;
+      // Heavier on the way down than on the way up: jumps feel weighty
+      // without changing how high they go.
+      const gravity = this.vy < 0 ? MOVEMENT.gravityRise : MOVEMENT.gravityFall;
+      this.vy = Math.min(MOVEMENT.maxFall, this.vy + gravity * dt);
       this.y += this.vy * dt;
       this.x += this.vx * dt;
       if (this.y >= GROUND_Y) {
@@ -405,6 +463,9 @@ class Fighter {
         const landingVy = this.vy;
         this.vy = 0;
         this.airAttackUsed = false;
+        this.jumpHeld = false;
+        // Squash scales with impact speed and is read by the renderer.
+        this.landSquash = Math.max(this.landSquash || 0, Math.min(1, landingVy / 1150));
         if (this.state === 'hit') {
           this.state = 'down';
           this.stateTime = 0;
@@ -416,7 +477,10 @@ class Fighter {
           this.state = 'idle';
           this.stateTime = 0;
           this.game.addShake(2);
-          spawnParticles(this.game, this.x, GROUND_Y, 'dust', 7, { speed: [20, 90] });
+          const dust = landingVy > 700 ? 10 : 6;
+          spawnParticles(this.game, this.x, GROUND_Y, 'dust', dust, {
+            speed: [20, 90 + Math.min(120, landingVy * 0.08)], angle: -Math.PI / 2, spread: 2.4
+          });
         }
         if (landingVy > 700) this.game.addShake(3);
       }
@@ -424,13 +488,49 @@ class Fighter {
       this.y = GROUND_Y;
       if (this.vy > 0) this.vy = 0;
       this.x += this.vx * dt;
-      if (this.state !== 'dash') this.vx *= Math.max(0, 1 - 15 * dt);
+
       if (this.state === 'dash') {
         this.dashTime -= dt;
+        const p = 1 - Math.max(0, this.dashTime) / this.dashDuration;
+        this.vx = this.status.root ? 0 : this.dashDir * (MOVEMENT.dashSpeed + (MOVEMENT.dashEndSpeed - MOVEMENT.dashSpeed) * p);
+        this.dashTrailT -= dt;
+        if (this.dashTrailT <= 0) {
+          this.dashTrailT = 0.04;
+          this.game.afterimages.push({
+            x: this.x, y: this.y, facing: this.facing, char: this.char,
+            life: 0.22, maxLife: 0.22, playerIndex: this.playerIndex
+          });
+        }
         if (this.dashTime <= 0) this.toIdle();
+      } else if (this.state !== 'walk') {
+        // Frame-rate independent ground friction (knockback, whiffs, landing).
+        this.vx *= Math.exp(-15 * dt);
+        if (Math.abs(this.vx) < 3) this.vx = 0;
       }
     }
     this.x = Math.max(WALL_L, Math.min(WALL_R, this.x));
+  }
+
+  /* Small dust puffs on each footfall, synced to the walk cycle. */
+  updateFootsteps() {
+    if (this.ko || this.state !== 'walk' || !this.grounded()) {
+      this.lastFootPhase = Math.floor((this.gait || 0) / Math.PI);
+      return;
+    }
+    const speed = Math.abs(this.vx);
+    if (speed < MOVEMENT.walkFootstepSpeed) {
+      this.lastFootPhase = Math.floor((this.gait || 0) / Math.PI);
+      return;
+    }
+    const phase = Math.floor((this.gait || 0) / Math.PI);
+    if (phase === this.lastFootPhase) return;
+    this.lastFootPhase = phase;
+    if (this.game.particles.length < 240) {
+      spawnParticles(this.game, this.x - this.facing * 9, GROUND_Y, 'dust', 2, {
+        speed: [8, 34], angle: -Math.PI / 2, spread: 2.4,
+        life: [0.22, 0.42], size: [1.2, 2.6]
+      });
+    }
   }
 
   canAct() {
@@ -447,6 +547,13 @@ class Fighter {
       return;
     }
     if (!this.grounded()) {
+      // Variable jump height: releasing jump after the initial rise cuts the
+      // hop short, so a tap is a small hop and a hold is a full leap.
+      if (this.jumpHeld && !input.held.up && this.state === 'jump' &&
+          this.stateTime > MOVEMENT.jumpCutDelay && this.vy < -MOVEMENT.jumpCutSpeed) {
+        this.vy = -MOVEMENT.jumpCutSpeed;
+        this.jumpHeld = false;
+      }
       // air attacks
       if ((input.pressed.punch || input.pressed.kick) && !this.airAttackUsed) {
         this.airAttackUsed = true;
@@ -454,10 +561,15 @@ class Fighter {
         this.startAttack({ move, air: true });
         return;
       }
-      // some air drift
-      if (input.held.left) this.vx -= 260 * dt;
-      if (input.held.right) this.vx += 260 * dt;
-      this.vx = Math.max(-this.walkSpeed, Math.min(this.walkSpeed, this.vx));
+      // Air control accelerates rather than snapping, and keeps momentum
+      // that is already faster than walking speed.
+      const airDir = (input.held.right ? 1 : 0) - (input.held.left ? 1 : 0);
+      if (airDir !== 0) {
+        const airMax = this.walkSpeed * this.speedMultiplier();
+        if (this.vx * airDir < airMax) {
+          this.vx = approach(this.vx, airDir * airMax, MOVEMENT.airAccel * dt);
+        }
+      }
       return;
     }
 
@@ -502,6 +614,9 @@ class Fighter {
     }
 
     if (input.pressed.up) {
+      // Only a held jump can be cut short; a tap or a scripted jump (CPU)
+      // still gets the full arc.
+      this.jumpHeld = !!input.held.up;
       this.jump();
       return;
     }
@@ -542,16 +657,27 @@ class Fighter {
       return;
     }
 
-    // walking
+    // Ground movement: accelerate/decelerate with weight instead of teleporting
+    // to full speed. The gait advances with distance travelled, so feet stay
+    // planted to the floor rather than skating.
     if (this.status.root) { this.vx = 0; this.state = 'idle'; return; }
     const spd = this.walkSpeed * this.speedMultiplier();
     if (dir !== 0) {
-      this.vx = dir * spd;
+      const reversing = this.vx !== 0 && Math.sign(this.vx) !== dir;
+      const accel = reversing ? MOVEMENT.turnAccel : MOVEMENT.groundAccel;
+      this.vx = approach(this.vx, dir * spd, accel * dt);
       this.state = 'walk';
-      this.gait = (this.gait || 0) + dt * 11 * (spd / 280);
+      if (reversing && Math.abs(this.vx) > 150 && this.skidCd <= 0) {
+        this.skidCd = 0.32;
+        spawnParticles(this.game, this.x, GROUND_Y, 'dust', 4, {
+          speed: [15, 70], angle: -Math.PI / 2, spread: 2.3,
+          life: [0.25, 0.5], size: [1.5, 3]
+        });
+      }
     } else {
-      this.state = 'idle';
-      this.vx *= 0.7;
+      this.vx = approach(this.vx, 0, MOVEMENT.groundDecel * dt);
+      // Keep the stride alive through the short glide to a stop.
+      this.state = Math.abs(this.vx) > 8 ? 'walk' : 'idle';
     }
   }
 
@@ -573,7 +699,7 @@ class Fighter {
     this.stateTime = 0;
     this.vy = -1070;
     this.y -= 2;
-    this.vx *= 0.4;
+    this.vx *= 0.75; // carry running momentum into the air
     this.airAttackUsed = false;
     this.crouching = false;
     this.blocking = false;
@@ -584,12 +710,18 @@ class Fighter {
   startDash(dir) {
     this.state = 'dash';
     this.stateTime = 0;
-    this.dashTime = 0.18;
+    this.dashDuration = MOVEMENT.dashTime;
+    this.dashTime = this.dashDuration;
     this.dashCd = 0.55;
-    this.vx = dir * 760;
-    this.facing = dir;
+    this.dashDir = dir;
+    this.dashTrailT = 0;
+    this.vx = dir * MOVEMENT.dashSpeed;
     this.crouching = false;
+    this.blocking = false;
     AudioSys.play('whoosh');
+    spawnParticles(this.game, this.x, GROUND_Y, 'dust', 5, {
+      speed: [30, 110], angle: dir > 0 ? Math.PI : 0, spread: 1.6
+    });
     this.game.afterimages.push({ x: this.x, y: this.y, facing: this.facing, char: this.char, life: 0.25, maxLife: 0.25, playerIndex: this.playerIndex });
   }
 
