@@ -4,6 +4,8 @@ A complete, playable 2D mythological fighting game built from the *Olympus: Surv
 
 Ten gods. Six arenas. Three rounds. No mercy.
 
+**▶ Play online: <https://shapleya.github.io/olympus-survival/>**
+
 Everything — characters, animation, arenas, particles, UI and sound — is generated in code. There are no external image, font or audio assets, no network calls, and no build step.
 
 ![Title screen](docs/screenshot-title.png)
@@ -20,7 +22,9 @@ Everything — characters, animation, arenas, particles, UI and sound — is gen
 
 ## Quick start
 
-Open **`index.html`** in a modern browser (Chrome, Edge or Firefox).
+Play it in any modern browser at **<https://shapleya.github.io/olympus-survival/>** — desktop or mobile.
+
+To run it locally, open **`index.html`** in a browser (Chrome, Edge or Firefox).
 
 For the cleanest experience (and to avoid any `file://` storage quirks), serve the folder:
 
