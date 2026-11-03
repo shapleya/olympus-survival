@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#05030a">
+  <title>OLYMPUS: SURVIVAL — Mythological Fighting Game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="1280" height="720" aria-label="Olympus Survival fighting game"></canvas>
+    <div id="ui">
+
+      <!-- ================= TITLE ================= -->
+      <section id="screen-title" class="screen active title-screen">
+        <div class="title-ornament top"></div>
+        <div class="title-inner">
+          <div class="eyebrow">A MYTHOLOGICAL FIGHTING GAME</div>
+          <h1 class="logo">OLYMPUS</h1>
+          <div class="logo-sub">SURVIVAL</div>
+          <div class="title-rule"><span></span></div>
+          <p class="tagline">TEN GODS. ONE THRONE. NO MERCY.</p>
+          <nav class="menu">
+            <button class="menu-btn" data-action="arcade">ARCADE</button>
+            <button class="menu-btn" data-action="versus">VERSUS</button>
+            <button class="menu-btn" data-action="training">TRAINING</button>
+            <button class="menu-btn" data-action="roster">CODEX</button>
+            <button class="menu-btn" data-action="controls">CONTROLS</button>
+          </nav>
+          <div class="title-foot">
+            <span>BEST OF 3</span><i>·</i><span>LOCAL 2P</span><i>·</i><span>CONTROLLER READY</span>
+          </div>
+          <div id="title-progress" class="title-progress"></div>
+        </div>
+        <div class="title-ornament bottom"></div>
+      </section>
+
+      <!-- ================= CHARACTER SELECT ================= -->
+      <section id="screen-select" class="screen select-screen">
+        <header class="screen-head">
+          <button class="ghost-btn" data-action="back">&#8592; BACK</button>
+          <div class="head-centre">
+            <div id="select-kicker" class="kicker">VERSUS</div>
+            <h2 id="select-title">CHOOSE YOUR GOD</h2>
+            <div id="select-story" class="select-story"></div>
+          </div>
+          <button class="ghost-btn" data-action="mute" id="btn-mute-select">SOUND ON</button>
+        </header>
+
+        <div class="select-body">
+          <div class="picks">
+            <button class="pick-card" data-action="pick-p1" id="pick-p1">
+              <span class="pick-label">PLAYER 1</span>
+              <span class="pick-name" id="pick-name-p1">SELECTING…</span>
+              <span class="pick-role" id="pick-role-p1"></span>
+            </button>
+            <button class="pick-card" data-action="pick-p2" id="pick-p2">
+              <span class="pick-label" id="pick-label-p2">PLAYER 2</span>
+              <span class="pick-name" id="pick-name-p2">SELECTING…</span>
+              <span class="pick-role" id="pick-role-p2"></span>
+            </button>
+            <div class="select-toggles" id="select-toggles"></div>
+          </div>
+
+          <div class="select-main">
+            <div id="char-grid" class="char-grid"></div>
+            <aside id="char-info" class="char-info"></aside>
+          </div>
+
+          <div class="arena-strip">
+            <span class="strip-label">BATTLEGROUND</span>
+            <div id="arena-row" class="arena-row"></div>
+          </div>
+
+          <footer class="select-foot">
+            <div class="foot-left">
+              <div id="difficulty-row" class="difficulty-row"></div>
+              <button class="ghost-btn" data-action="random">RANDOM</button>
+            </div>
+            <button class="primary-btn" id="btn-start" data-action="start">BEGIN THE TRIAL</button>
+          </footer>
+        </div>
+      </section>
+
+      <!-- ================= CONTROLS ================= -->
+      <section id="screen-controls" class="screen controls-screen">
+        <header class="screen-head">
+          <button class="ghost-btn" data-action="back">&#8592; BACK</button>
+          <div class="head-centre">
+            <div class="kicker">CONFIGURATION</div>
+            <h2>CONTROLS</h2>
+          </div>
+          <button class="ghost-btn" data-action="mute" id="btn-mute-controls">SOUND ON</button>
+        </header>
+        <div class="controls-body">
+          <div class="controls-columns">
+            <div class="controls-table" id="controls-p1"></div>
+            <div class="controls-table" id="controls-p2"></div>
+          </div>
+          <div class="controls-notes">
+            <div class="note-card">
+              <h3>COMBINATIONS</h3>
+              <p><b>Forward + Punch/Kick</b> — heavy forward attack</p>
+              <p><b>Back + Punch/Kick</b> — back attack</p>
+              <p><b>Down + Punch/Kick</b> — low punch / sweep</p>
+              <p><b>Punch/Kick in the air</b> — aerial attacks</p>
+              <p><b>Special 1 + Special 2</b> — third unique power</p>
+              <p><b>Double tap ← / →</b> — dash</p>
+            </div>
+            <div class="note-card">
+              <h3>DIVINE FURY</h3>
+              <p><b>25%</b> — the super button amplifies Special 1.</p>
+              <p><b>50%</b> — the super button unleashes a Divine Art combo.</p>
+              <p><b>100%</b> — the super button triggers your ultimate.</p>
+              <p class="dim">Fury builds by dealing damage, taking damage and blocking.</p>
+            </div>
+            <div class="note-card">
+              <h3>ABOUT THE KEYBOARD</h3>
+              <p class="dim">Cheap keyboards can drop simultaneous key presses (ghosting). If inputs vanish during local 2P, remap the buttons to keys on opposite sides of the board, or use controllers.</p>
+              <p class="dim">Gamepads: A punch · B kick · X special 1 · Y special 2 · LB/RB/LT block · RT super · Start pause.</p>
+              <button class="ghost-btn small" data-action="reset-bindings">RESET DEFAULTS</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CODEX ================= -->
+      <section id="screen-roster" class="screen roster-screen">
+        <header class="screen-head">
+          <button class="ghost-btn" data-action="back">&#8592; BACK</button>
+          <div class="head-centre">
+            <div class="kicker">THE PANTHEON</div>
+            <h2>CODEX</h2>
+          </div>
+          <button class="ghost-btn" data-action="mute" id="btn-mute-roster">SOUND ON</button>
+        </header>
+        <div id="roster-body" class="roster-body"></div>
+      </section>
+
+      <!-- ================= PAUSE ================= -->
+      <div id="screen-pause" class="overlay hidden">
+        <div class="modal pause-modal">
+          <div class="modal-kicker">THE BATTLE WAITS</div>
+          <h2>PAUSED</h2>
+          <p id="pause-sub" class="modal-sub"></p>
+          <div class="modal-actions column">
+            <button class="primary-btn" data-action="resume">RESUME</button>
+            <button class="ghost-btn" data-action="restart">RESTART MATCH</button>
+            <button class="ghost-btn" data-action="quit">QUIT TO MENU</button>
+          </div>
+          <div class="pause-hint">ESC to resume</div>
+        </div>
+      </div>
+
+      <!-- ================= RESULTS ================= -->
+      <div id="screen-results" class="overlay hidden">
+        <div class="modal results-modal">
+          <div id="result-body"></div>
+          <div id="result-actions" class="modal-actions"></div>
+        </div>
+      </div>
+
+      <button class="mute-float" data-action="mute" id="btn-mute-float" title="Toggle sound">&#9834;</button>
+      <div id="toast" class="toast"></div>
+      <div id="unlock-banner" class="unlock-banner hidden">ZEUS UNLOCKED</div>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
