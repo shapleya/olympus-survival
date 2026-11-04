@@ -961,7 +961,7 @@ const Game = {
     ctx.restore();
 
     // cinematic focus
-    Render.drawVignette(ctx, 'rgba(0,0,0,', 0.36);
+    Render.drawVignette(ctx, 'rgba(0,0,0,', 0.24);
 
     // HUD
     HUD.draw(ctx, this);

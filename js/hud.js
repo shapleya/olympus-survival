@@ -345,7 +345,7 @@ const HUD = (() => {
 
     c.save();
     // darken
-    c.fillStyle = `rgba(4,3,10,${0.55 + Math.sin(p * Math.PI) * 0.12})`;
+    c.fillStyle = `rgba(4,3,10,${0.38 + Math.sin(p * Math.PI) * 0.08})`;
     c.fillRect(0, 0, GAME_W, GAME_H);
 
     // speed lines
@@ -367,8 +367,8 @@ const HUD = (() => {
 
     // coloured vignette
     c.save();
-    c.globalAlpha = 0.5;
-    Render.drawVignette(c, 'rgba(4,2,10,', 0.85);
+    c.globalAlpha = 0.35;
+    Render.drawVignette(c, 'rgba(4,2,10,', 0.7);
     c.restore();
 
     // attacker spotlight
