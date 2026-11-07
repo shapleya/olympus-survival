@@ -180,6 +180,10 @@ js/main.js          game loop
 - **Save data.** `localStorage` keys: `olympus_save_v1` (Zeus unlock and arcade clears), `olympus_bindings` (controls), `olympus_muted` (sound preference).
 - **Balance.** Damage, cooldowns, frame data and AI tuning live in `js/data.js` and `js/ai.js` for easy iteration.
 
+### Deployment
+
+Pushes to `main` deploy through GitHub Actions (`.github/workflows/pages.yml`). The workflow stamps the commit SHA onto `styles.css` and every `js/*.js` URL in `index.html`, so browsers fetch the new build instead of reusing a cached copy. The repository's Pages source must remain set to **GitHub Actions**.
+
 ### Limitations / next steps
 
 - Local play only; there is no online netcode.
