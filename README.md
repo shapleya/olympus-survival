@@ -69,7 +69,7 @@ Rounds are best of three with a 60-second timer. The player with more health win
 | Block | `I` | `T` |
 | Superpower | `O` | `Y` |
 
-`Esc` pauses. `M` toggles sound. Every binding can be changed from the **Controls** screen; bindings and progress are stored in `localStorage`.
+`Esc` pauses. `M` toggles sound. `F3` shows a live FPS/frame-time readout (or open the page with `?perf`). Every binding can be changed from the **Controls** screen; bindings and progress are stored in `localStorage`.
 
 ### Command normals
 

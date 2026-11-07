@@ -18,6 +18,7 @@ const MOVEMENT = {
   dashTime: 0.18,
   dashSpeed: 820,
   dashEndSpeed: 620,
+  inputBuffer: 0.16,      // how long a press stays queued through recovery
   gaitPerPixel: 0.039,   // keeps the stride locked to distance travelled
   walkFootstepSpeed: 60
 };
@@ -343,6 +344,8 @@ class Fighter {
       return;
     }
 
+    this.updateBufferedInput(dt, input);
+
     if (this.status.freeze) {
       this.state = 'frozen';
       this.vx = 0;
@@ -551,6 +554,71 @@ class Fighter {
     return true;
   }
 
+  /* ---------------- Input buffering ----------------
+     A press made during an attack, hitstun or dash is remembered briefly and
+     fires on the first actionable frame. This is what lets players chain
+     moves and press slightly early instead of mashing for frame-perfect
+     timing. */
+  isCommitted() {
+    return this.state === 'attack' || this.state === 'special' || this.state === 'hit' ||
+      this.state === 'down' || this.state === 'dash' || this.state === 'stunned' ||
+      this.state === 'frozen' || this.state === 'ultimate';
+  }
+
+  updateBufferedInput(dt, input) {
+    if (this.buffered) {
+      this.buffered.t -= dt;
+      if (this.buffered.t <= 0) this.buffered = null;
+    }
+    if (this.isCommitted()) this.captureBufferedInput(input);
+  }
+
+  captureBufferedInput(input) {
+    if (!input || !input.pressed || this.ko) return;
+    if (this.game.roundState !== 'fight' && this.game.mode !== 'training') return;
+    const p = input.pressed;
+    const h = input.held || {};
+    let action = null;
+    if ((p.s1 && h.s2) || (p.s2 && h.s1) || (p.s1 && p.s2)) action = 'combo';
+    else if (p.s1) action = 's1';
+    else if (p.s2) action = 's2';
+    else if (p.super) action = 'super';
+    else if (p.punch) action = 'punch';
+    else if (p.kick) action = 'kick';
+    if (action) this.buffered = { action, t: MOVEMENT.inputBuffer };
+  }
+
+  tryBufferedAction(input) {
+    if (!this.buffered || !this.canAct() || !this.grounded()) return false;
+    const action = this.buffered.action;
+    this.buffered = null;
+    if (action === 'punch' || action === 'kick') this.startBasic(action, input);
+    else if (action === 'combo') this.trySpecial(2);
+    else if (action === 's1') this.trySpecial(0);
+    else if (action === 's2') this.trySpecial(1);
+    else if (action === 'super') this.useSuper();
+    return true;
+  }
+
+  startBasic(kind, input) {
+    const dir = (input.held.right ? 1 : 0) - (input.held.left ? 1 : 0);
+    const forward = dir === this.facing && dir !== 0;
+    const back = dir === -this.facing && dir !== 0;
+    let move;
+    if (kind === 'punch') {
+      if (input.held.down) move = this.char.basics.lowPunch;
+      else if (forward) move = this.char.basics.forward;
+      else if (back) move = this.char.basics.back;
+      else move = this.char.basics.punch;
+    } else {
+      if (input.held.down) move = this.char.basics.sweep;
+      else if (forward) move = this.char.basics.forward;
+      else if (back) move = this.char.basics.back;
+      else move = this.char.basics.kick;
+    }
+    this.startAttack({ move });
+  }
+
   handleInput(dt, input, opponent) {
     if (this.game.roundState !== 'fight' && this.game.mode !== 'training') {
       if (this.state !== 'idle' && this.state !== 'victory' && this.state !== 'ko') this.toIdle();
@@ -590,6 +658,7 @@ class Fighter {
       this.vx = 0;
       return;
     }
+    if (this.tryBufferedAction(input)) return;
     if (input.held.block && this.state !== 'attack') {
       this.crouching = !!input.held.down;
       if (this.state !== 'block') {
@@ -645,25 +714,13 @@ class Fighter {
     if (input.pressed.super) { this.useSuper(); return; }
 
     const dir = (input.held.right ? 1 : 0) - (input.held.left ? 1 : 0);
-    const forward = dir === this.facing && dir !== 0;
-    const back = dir === -this.facing && dir !== 0;
 
     if (input.pressed.punch) {
-      let move;
-      if (input.held.down) move = this.char.basics.lowPunch;
-      else if (forward) move = this.char.basics.forward;
-      else if (back) move = this.char.basics.back;
-      else move = this.char.basics.punch;
-      this.startAttack({ move });
+      this.startBasic('punch', input);
       return;
     }
     if (input.pressed.kick) {
-      let move;
-      if (input.held.down) move = this.char.basics.sweep;
-      else if (forward) move = this.char.basics.forward;
-      else if (back) move = this.char.basics.back;
-      else move = this.char.basics.kick;
-      this.startAttack({ move });
+      this.startBasic('kick', input);
       return;
     }
 
@@ -688,18 +745,6 @@ class Fighter {
       this.vx = approach(this.vx, 0, MOVEMENT.groundDecel * dt);
       // Keep the stride alive through the short glide to a stop.
       this.state = Math.abs(this.vx) > 8 ? 'walk' : 'idle';
-    }
-  }
-
-  tryBuffered() {
-    if (!this.buffered) return;
-    this.buffered.t -= this.game.lastDt || 0.016;
-    if (this.buffered.t <= 0) { this.buffered = null; return; }
-    if (this.canAct() && this.grounded()) {
-      const action = this.buffered.action;
-      this.buffered = null;
-      if (action === 'punch') this.startAttack({ move: this.char.basics.punch });
-      else if (action === 'kick') this.startAttack({ move: this.char.basics.kick });
     }
   }
 
@@ -793,7 +838,6 @@ class Fighter {
       this.attackHit = false;
       this.crouching = false;
       this.toIdle();
-      this.tryBuffered();
     }
   }
 

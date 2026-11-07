@@ -1265,6 +1265,24 @@ h2 {
 
 .mute-float.muted { color: rgba(255, 255, 255, 0.3); text-decoration: line-through; }
 
+/* Frame-time readout. Toggle with F3 or open the page with ?perf. */
+.perf {
+  position: absolute;
+  left: 0.7em;
+  bottom: 0.7em;
+  padding: 0.35em 0.6em;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.62em;
+  letter-spacing: 0.04em;
+  color: #9fe6ff;
+  background: rgba(5, 4, 10, 0.72);
+  border: 1px solid rgba(159, 230, 255, 0.25);
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 45;
+}
+
 .unlock-banner {
   position: absolute;
   top: 14%;

@@ -93,7 +93,9 @@ const Game = {
     this.schedules = [];
     this.cinematic = null;
     this.pendingKO = null;
-    this.introTimer = 2.35;
+    // The FIGHT! banner fires at 1.55s; controls unlock at the same moment
+    // instead of leaving a dead gap between the banner and the first input.
+    this.introTimer = 1.55;
     this.roundState = 'intro';
     this.timer = ROUND_TIME;
     this.koTimer = 0;
@@ -178,6 +180,11 @@ const Game = {
 
     if (this.hitstop > 0) {
       this.hitstop = Math.max(0, this.hitstop - dt);
+      // Fighters are frozen during hitstop, but a press made now should still
+      // be queued for the first actionable frame afterwards.
+      const [hf1, hf2] = this.fighters;
+      if (hf1 && !hf1.isCPU) hf1.captureBufferedInput(Input.players.p1);
+      if (hf2 && !hf2.isCPU) hf2.captureBufferedInput(Input.players.p2);
       this.updateParticles(dt);
       this.updateTexts(dt);
       return;

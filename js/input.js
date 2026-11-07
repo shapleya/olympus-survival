@@ -15,6 +15,10 @@ const Input = (() => {
   let capture = null;
   let pads = [];
   let anyPressedThisFrame = false;
+  // Key taps that arrive between two polls must still register once. Without
+  // this, a fast tap (or a tap during a heavy frame) can be pressed and
+  // released before poll() ever sees it.
+  const tappedCodes = new Set();
 
   function saveBindings() {
     try { localStorage.setItem('olympus_bindings', JSON.stringify(bindings)); } catch (e) { /* ignore */ }
@@ -62,7 +66,10 @@ const Input = (() => {
       return;
     }
     if (isBound(e.code) || GAME_KEYS.has(e.code)) e.preventDefault();
-    if (!e.repeat) anyPressedThisFrame = true;
+    if (!e.repeat) {
+      anyPressedThisFrame = true;
+      tappedCodes.add(e.code);
+    }
     down.add(e.code);
   }, { passive: false });
 
@@ -70,7 +77,10 @@ const Input = (() => {
     down.delete(e.code);
   });
 
-  window.addEventListener('blur', () => down.clear());
+  window.addEventListener('blur', () => {
+    down.clear();
+    tappedCodes.clear();
+  });
 
   window.addEventListener('gamepadconnected', (e) => {
     pads[e.gamepad.index] = e.gamepad;
@@ -128,11 +138,13 @@ const Input = (() => {
       p.released = {};
       for (const a of ACTIONS) {
         const id = a.id;
-        if (held[id] && !p.prev[id]) p.pressed[id] = true;
+        const tapped = tappedCodes.has(bindings[pid][id]);
+        if (tapped || (held[id] && !p.prev[id])) p.pressed[id] = true;
         if (!held[id] && p.prev[id]) p.released[id] = true;
         if (p.pressed[id]) anyPressedThisFrame = true;
       }
     }
+    tappedCodes.clear();
     return players;
   }
 
