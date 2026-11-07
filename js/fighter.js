@@ -64,6 +64,16 @@ class Fighter {
     this.powerMult = 0.82 + this.char.stats.power * 0.045;
     this.defenseMult = 1.12 - this.char.stats.defense * 0.03;
 
+    // Very Easy gives the CPU a deliberate handicap on top of its weaker AI:
+    // less health, softer hits and slower movement.
+    if (this.isCPU && game && game.difficulty === 'veryeasy' && game.mode !== 'training') {
+      this.maxHp = Math.round(MAX_HP * 0.7);
+      this.hp = this.maxHp;
+      this.displayHp = this.maxHp;
+      this.powerMult *= 0.65;
+      this.walkSpeed *= 0.9;
+    }
+
     this.crouching = false;
     this.blocking = false;
     this.blockstunT = 0;

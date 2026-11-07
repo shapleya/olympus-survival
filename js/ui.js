@@ -236,8 +236,13 @@ const UI = (() => {
     const diffRow = el('difficulty-row');
     const showDiff = state.mode === 'arcade' || (state.mode === 'versus' && !state.p2Human);
     diffRow.style.display = showDiff ? 'flex' : 'none';
-    diffRow.innerHTML = ['easy', 'normal', 'hard'].map(d =>
-      `<button data-diff="${d}" class="${state.difficulty === d ? 'on' : ''}">${d.toUpperCase()}</button>`
+    diffRow.innerHTML = [
+      ['veryeasy', 'VERY EASY'],
+      ['easy', 'EASY'],
+      ['normal', 'NORMAL'],
+      ['hard', 'HARD']
+    ].map(([id, label]) =>
+      `<button data-diff="${id}" class="${state.difficulty === id ? 'on' : ''}">${label}</button>`
     ).join('');
 
     // start button

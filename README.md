@@ -43,7 +43,7 @@ The game is designed for a 1280×720 stage and scales to any window. It supports
 | Mode | Description |
 | --- | --- |
 | **Arcade** | Pick a god and climb a six-fight ladder: five gods, then Zeus himself. Win the ladder to unlock Zeus. |
-| **Versus** | Local 2-player, or 1P vs CPU with Easy / Normal / Hard AI. |
+| **Versus** | Local 2-player, or 1P vs CPU with Very Easy / Easy / Normal / Hard AI. |
 | **Training** | A passive dummy, regenerating health and fury, and a stage for learning every move. |
 | **Codex** | Full roster reference: specials, ultimates, passives and fighting styles. |
 | **Controls** | View and remap every key for both players. |

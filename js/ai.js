@@ -4,6 +4,7 @@
 
 const AI = (() => {
   const DIFF = {
+    veryeasy: { react: 0.85, block: 0.08, special: 0.12, aggression: 0.35, ult: 0.1, mistakes: 0.4 },
     easy: { react: 0.52, block: 0.24, special: 0.28, aggression: 0.55, ult: 0.35, mistakes: 0.22 },
     normal: { react: 0.3, block: 0.55, special: 0.5, aggression: 0.75, ult: 0.7, mistakes: 0.1 },
     hard: { react: 0.16, block: 0.82, special: 0.72, aggression: 0.94, ult: 0.95, mistakes: 0.03 }
