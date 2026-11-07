@@ -344,31 +344,25 @@ const HUD = (() => {
     const pal = att.char.palette;
 
     c.save();
-    // darken
-    c.fillStyle = `rgba(4,3,10,${0.38 + Math.sin(p * Math.PI) * 0.08})`;
-    c.fillRect(0, 0, GAME_W, GAME_H);
+    const ax = att.x;
+    const ay = att.y - att.currentHeight() * 0.55;
 
-    // speed lines
+    // Speed lines radiate from the attacker, never from the centre of the
+    // screen, and stay short enough to read as a launch flourish.
     c.save();
     c.globalCompositeOperation = 'lighter';
-    c.globalAlpha = 0.1 + Math.sin(p * Math.PI) * 0.1;
-    for (let i = 0; i < 26; i++) {
+    c.globalAlpha = 0.08 + Math.sin(p * Math.PI) * 0.08;
+    for (let i = 0; i < 18; i++) {
       const a = Render.seeded(i) * Math.PI * 2;
-      const r1 = 200 + Render.seeded(i + 9) * 400;
-      const len = 200 + Render.seeded(i + 3) * 500;
+      const r1 = 40 + Render.seeded(i + 9) * 120;
+      const len = 60 + Render.seeded(i + 3) * 140;
       c.strokeStyle = pal.glow;
       c.lineWidth = 1 + Render.seeded(i + 2) * 2;
       c.beginPath();
-      c.moveTo(GAME_W / 2 + Math.cos(a) * r1, GAME_H / 2 + Math.sin(a) * r1 * 0.6);
-      c.lineTo(GAME_W / 2 + Math.cos(a) * (r1 + len), GAME_H / 2 + Math.sin(a) * (r1 + len) * 0.6);
+      c.moveTo(ax + Math.cos(a) * r1, ay + Math.sin(a) * r1 * 0.6);
+      c.lineTo(ax + Math.cos(a) * (r1 + len), ay + Math.sin(a) * (r1 + len) * 0.6);
       c.stroke();
     }
-    c.restore();
-
-    // coloured vignette
-    c.save();
-    c.globalAlpha = 0.35;
-    Render.drawVignette(c, 'rgba(4,2,10,', 0.7);
     c.restore();
 
     // attacker spotlight
@@ -439,6 +433,12 @@ const HUD = (() => {
     const cyScreen = cy;
     const atkX = cin.attacker.x;
     const atkY = cin.attacker.y - cin.attacker.currentHeight() * 0.55;
+    // Launch -> travel -> impact. The attack visual reaches the defender just
+    // before the damage frame at 1.55s, so every ultimate reads as a strike
+    // that starts at the attacker instead of an effect already on the target.
+    const travel = clamp((p - 0.10) / 0.40, 0, 1);
+    const hit = travel >= 1;
+    const dir = Math.sign(cxScreen - atkX) || 1;
 
     c.save();
     switch (kind) {
@@ -519,17 +519,31 @@ const HUD = (() => {
             c.beginPath(); c.moveTo(bx, 0); c.lineTo(bx + Math.sin(t * 5 + i) * 12, cyScreen - 80); c.stroke();
           }
         }
-        // bolt
-        if (p > 0.3) {
-          drawLightning(c, atkX - 30, 0, cxScreen, cyScreen, '#dff4ff', 10, t, 5);
-          drawLightning(c, atkX + 60, 0, cxScreen - 30, cyScreen + 30, '#9fdcff', 5, t + 2, 4);
-          Render.glowCircle(c, cxScreen, cyScreen, 220, 'rgba(190,240,255,0.8)', 0.5);
+        // The bolt reaches from the storm above the attacker to the defender.
+        if (travel > 0.02) {
+          const tx = lerp(atkX - 30, cxScreen, travel);
+          const ty = lerp(0, cyScreen, travel);
+          drawLightning(c, atkX - 30, 0, tx, ty, '#dff4ff', 10, t, 5);
+          const tx2 = lerp(atkX + 60, cxScreen - 30, travel);
+          const ty2 = lerp(0, cyScreen + 30, travel);
+          drawLightning(c, atkX + 60, 0, tx2, ty2, '#9fdcff', 5, t + 2, 4);
+          if (hit) Render.glowCircle(c, cxScreen, cyScreen, 220, 'rgba(190,240,255,0.8)', 0.5);
         }
         break;
       }
       case 'hera': {
+        // A golden chain of hearts reaches from Hera to the defender first.
+        if (!hit && travel > 0.02) {
+          const hx = lerp(atkX, cxScreen, travel);
+          const hy = lerp(atkY, cyScreen, travel) - Math.sin(travel * Math.PI) * 40;
+          c.strokeStyle = 'rgba(255,216,115,0.55)';
+          c.lineWidth = 2;
+          c.beginPath(); c.moveTo(atkX, atkY); c.lineTo(hx, hy); c.stroke();
+          Render.glowCircle(c, hx, hy, 46, 'rgba(255,216,115,0.7)', 0.45);
+          drawHeart(c, hx, hy, 10 + Math.sin(t * 8) * 2, '#ff9fc4', 0.9);
+        }
         // golden chains and hearts
-        if (p > 0.1) {
+        if (hit) {
           c.globalAlpha = 0.75;
           c.strokeStyle = '#ffd873';
           c.lineWidth = 4;
@@ -558,42 +572,54 @@ const HUD = (() => {
         break;
       }
       case 'poseidon': {
-        // giant wave
-        c.save();
-        c.translate(cxScreen, 0);
-        const waveH = 260 * easeOut(clamp((p - 0.1) * 2, 0, 1));
-        const g = c.createLinearGradient(0, GAME_H, 0, GAME_H - waveH);
-        g.addColorStop(0, 'rgba(10,80,120,0.9)');
-        g.addColorStop(0.6, 'rgba(50,190,220,0.8)');
-        g.addColorStop(1, 'rgba(210,255,255,0.85)');
-        c.fillStyle = g;
-        c.beginPath();
-        c.moveTo(-500, GAME_H);
-        for (let i = 0; i <= 10; i++) {
-          const x = -500 + i * 100;
-          const y = GAME_H - waveH + Math.sin(i * 0.8 + t * 5) * 30 - (i > 3 && i < 7 ? 70 : 0);
-          c.lineTo(x, y);
-        }
-        c.lineTo(500, GAME_H);
-        c.closePath();
-        c.fill();
-        c.strokeStyle = 'rgba(230,255,255,0.8)';
-        c.lineWidth = 5;
-        c.beginPath();
-        for (let i = 0; i <= 10; i++) {
-          const x = -500 + i * 100;
-          const y = GAME_H - waveH + Math.sin(i * 0.8 + t * 5) * 30 - (i > 3 && i < 7 ? 70 : 0);
-          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-        }
-        c.stroke();
-        c.restore();
-        // water hand
-        if (p > 0.42) {
-          const hp = clamp((p - 0.42) * 3, 0, 1);
+        // The wall of water launches from the attacker and sweeps forward.
+        {
+          const startX = atkX + dir * 90;
+          const waveX = lerp(startX, cxScreen, easeOut(travel));
+          const waveH = 260 * easeOut(clamp(travel * 1.15, 0, 1));
+          // trailing body of water behind the crest
+          if (travel > 0.02) {
+            const trailEnd = waveX - dir * 70;
+            const tg = c.createLinearGradient(startX, 0, trailEnd, 0);
+            tg.addColorStop(0, 'rgba(46,196,230,0.05)');
+            tg.addColorStop(1, 'rgba(46,196,230,0.35)');
+            c.fillStyle = tg;
+            c.fillRect(Math.min(startX, trailEnd), GAME_H - 42, Math.abs(trailEnd - startX), 42);
+          }
           c.save();
-          c.globalAlpha = 0.55 * hp;
+          c.translate(waveX, 0);
+          const g = c.createLinearGradient(0, GAME_H, 0, GAME_H - waveH);
+          g.addColorStop(0, 'rgba(10,80,120,0.9)');
+          g.addColorStop(0.6, 'rgba(50,190,220,0.8)');
+          g.addColorStop(1, 'rgba(210,255,255,0.85)');
+          c.fillStyle = g;
+          c.beginPath();
+          c.moveTo(-170, GAME_H);
+          for (let i = 0; i <= 8; i++) {
+            const x = -170 + i * 42.5;
+            const y = GAME_H - waveH + Math.sin(i * 0.9 + t * 5) * 24 - (i > 2 && i < 6 ? 60 : 0);
+            c.lineTo(x, y);
+          }
+          c.lineTo(170, GAME_H);
+          c.closePath();
+          c.fill();
+          c.strokeStyle = 'rgba(230,255,255,0.8)';
+          c.lineWidth = 5;
+          c.beginPath();
+          for (let i = 0; i <= 8; i++) {
+            const x = -170 + i * 42.5;
+            const y = GAME_H - waveH + Math.sin(i * 0.9 + t * 5) * 24 - (i > 2 && i < 6 ? 60 : 0);
+            if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+          }
+          c.stroke();
+          c.restore();
+        }
+        // water hand and impact only at the defender
+        if (hit) {
+          c.save();
+          c.globalAlpha = 0.55;
           c.fillStyle = '#5fdcff';
-          const hx = cxScreen + 160;
+          const hx = cxScreen + dir * 160;
           const hy = cyScreen + 60;
           c.beginPath();
           c.ellipse(hx, hy + 50, 80, 40, 0, 0, Math.PI * 2); c.fill();
@@ -609,29 +635,37 @@ const HUD = (() => {
         break;
       }
       case 'hephaestus': {
-        // red sky + meteors
-        c.fillStyle = `rgba(180,40,0,${0.12 + Math.sin(p * Math.PI) * 0.14})`;
-        c.fillRect(0, 0, GAME_W, GAME_H);
-        if (p > 0.15) {
+        // The forge charges in the attacker's hands.
+        if (!hit) {
+          Render.glowCircle(c, atkX, atkY, 90 + Math.sin(t * 8) * 10, 'rgba(255,120,30,0.5)', 0.35);
+        }
+        // Meteors arc from the sky above the attacker down onto the defender.
+        if (travel > 0.02) {
           for (let i = 0; i < 7; i++) {
             const seed = i * 37;
-            const mt = ((t * (0.8 + Render.seeded(seed) * 0.8) + Render.seeded(seed + 4)) % 1.4);
-            if (mt > 1.2) continue;
-            const mx = cxScreen - 400 + Render.seeded(seed + 1) * 700 + mt * 300;
-            const my = -100 + mt * (cyScreen + 220);
+            const sx = atkX + (Render.seeded(seed) - 0.5) * 140;
+            const sy = -80 - Render.seeded(seed + 1) * 120;
+            const ex = cxScreen + (Render.seeded(seed + 2) - 0.5) * 140;
+            const ey = cyScreen + (Render.seeded(seed + 3) - 0.5) * 90;
+            const mi = clamp(travel * 1.12 - i * 0.02, 0, 1);
+            if (mi <= 0 || mi >= 1) continue;
+            const mx = lerp(sx, ex, mi);
+            const my = lerp(sy, ey, mi) - Math.sin(mi * Math.PI) * 60;
+            c.strokeStyle = 'rgba(255,120,30,0.35)';
+            c.lineWidth = 6;
+            c.beginPath(); c.moveTo(sx, sy); c.lineTo(mx, my); c.stroke();
             c.save();
             c.translate(mx, my);
             c.rotate(0.8);
             c.fillStyle = '#ffb347';
-            c.beginPath(); c.ellipse(0, 0, 34, 16, 0, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.ellipse(0, 0, 30, 14, 0, 0, Math.PI * 2); c.fill();
             c.fillStyle = '#fff0a0';
-            c.beginPath(); c.arc(10, 0, 8, 0, Math.PI * 2); c.fill();
-            c.globalAlpha = 0.3;
-            c.fillStyle = '#ff6a1f';
-            c.beginPath(); c.ellipse(-90, 0, 100, 7, 0, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.arc(9, 0, 7, 0, Math.PI * 2); c.fill();
             c.restore();
           }
-          // crack
+        }
+        // Impact is confined to the defender.
+        if (hit) {
           c.strokeStyle = 'rgba(255,150,50,0.8)';
           c.lineWidth = 5 + Math.sin(t * 8) * 2;
           c.beginPath();
@@ -642,13 +676,22 @@ const HUD = (() => {
           c.lineTo(cxScreen + 100, GROUND_Y - 80);
           c.lineTo(cxScreen + 200, GROUND_Y);
           c.stroke();
-          Render.glowCircle(c, cxScreen, GROUND_Y, 300, 'rgba(255,120,30,0.5)', 0.5);
+          Render.glowCircle(c, cxScreen, GROUND_Y, 260, 'rgba(255,120,30,0.5)', 0.5);
         }
         break;
       }
       case 'furies': {
+        // Vengeance streaks across the gap before the sisters close in.
+        if (!hit && travel > 0.02) {
+          const fx = lerp(atkX, cxScreen, travel);
+          const fy = lerp(atkY, cyScreen, travel) - Math.sin(travel * Math.PI) * 30;
+          c.strokeStyle = 'rgba(255,95,143,0.45)';
+          c.lineWidth = 3;
+          c.beginPath(); c.moveTo(atkX, atkY); c.lineTo(fx, fy); c.stroke();
+          Render.glowCircle(c, fx, fy, 40, 'rgba(159,107,255,0.6)', 0.4);
+        }
         // three sisters + nightmare
-        if (p > 0.08) {
+        if (hit) {
           for (let i = 0; i < 3; i++) {
             const a = t * 0.8 + i * (Math.PI * 2 / 3);
             const sx = cxScreen + Math.cos(a) * 130;
@@ -679,7 +722,16 @@ const HUD = (() => {
         break;
       }
       case 'aphrodite': {
-        if (p > 0.05) {
+        // A trail of hearts crosses the gap first.
+        if (!hit && travel > 0.02) {
+          const hx = lerp(atkX, cxScreen, travel);
+          const hy = lerp(atkY, cyScreen, travel) - Math.sin(travel * Math.PI) * 36;
+          c.strokeStyle = 'rgba(255,159,196,0.4)';
+          c.lineWidth = 2;
+          c.beginPath(); c.moveTo(atkX, atkY); c.lineTo(hx, hy); c.stroke();
+          drawHeart(c, hx, hy, 12, '#ff6f9f', 0.9);
+        }
+        if (hit) {
           for (let i = 0; i < 24; i++) {
             const a = Render.seeded(i + 11) * Math.PI * 2 + t * 0.6;
             const r = 40 + Render.seeded(i + 5) * 240;
@@ -709,42 +761,50 @@ const HUD = (() => {
         break;
       }
       case 'apollo': {
-        // sun grows
-        const sun = 40 + easeOut(clamp(p * 1.6, 0, 1)) * 260;
-        Render.glowCircle(c, atkX, atkY - 120, sun * 1.6, 'rgba(255,220,100,0.7)', 0.6);
+        // The sun stays with Apollo; only the beam travels to the defender.
+        const sun = 36 + easeOut(clamp(p * 2, 0, 1)) * 90;
+        Render.glowCircle(c, atkX, atkY - 100, sun * 1.3, 'rgba(255,220,100,0.7)', 0.55);
         c.fillStyle = 'rgba(255,248,200,0.9)';
-        c.beginPath(); c.arc(atkX, atkY - 120, sun * 0.7, 0, Math.PI * 2); c.fill();
-        if (p > 0.3) {
-          // beam
-          const beam = clamp((p - 0.3) * 3, 0, 1);
+        c.beginPath(); c.arc(atkX, atkY - 100, sun * 0.65, 0, Math.PI * 2); c.fill();
+        if (travel > 0.02) {
+          const sx = atkX + dir * 10;
+          const sy = atkY - 110;
+          const tx = lerp(sx, cxScreen, easeOut(travel));
+          const ty = lerp(sy, cyScreen, easeOut(travel));
           c.save();
-          c.globalAlpha = 0.7 * beam;
+          c.globalAlpha = 0.75;
           c.globalCompositeOperation = 'lighter';
-          const g = c.createLinearGradient(atkX, atkY - 120, cxScreen, cyScreen);
+          const g = c.createLinearGradient(sx, sy, tx, ty);
           g.addColorStop(0, 'rgba(255,255,220,0.95)');
           g.addColorStop(0.6, 'rgba(255,220,100,0.7)');
           g.addColorStop(1, 'rgba(255,180,60,0.1)');
           c.fillStyle = g;
           c.beginPath();
-          c.moveTo(atkX - 20, atkY - 150);
-          c.lineTo(cxScreen - 120, cyScreen - 100);
-          c.lineTo(cxScreen + 120, cyScreen + 100);
-          c.lineTo(atkX + 20, atkY - 90);
+          c.moveTo(sx - 20, sy - 40);
+          c.lineTo(tx - 70, ty - 60);
+          c.lineTo(tx + 70, ty + 60);
+          c.lineTo(sx + 20, sy + 40);
           c.closePath();
           c.fill();
           c.restore();
-          Render.glowCircle(c, cxScreen, cyScreen, 220, 'rgba(255,240,160,0.8)', 0.5);
+          if (hit) Render.glowCircle(c, cxScreen, cyScreen, 190, 'rgba(255,240,160,0.8)', 0.5);
         }
         break;
       }
       case 'ares': {
-        // red rage + flurry
-        c.fillStyle = `rgba(140,20,10,${0.14 + Math.sin(p * Math.PI) * 0.12})`;
-        c.fillRect(0, 0, GAME_W, GAME_H);
-        if (p > 0.15) {
+        // War closes the distance before the flurry lands.
+        if (!hit && travel > 0.02) {
+          const rx = lerp(atkX, cxScreen, travel);
+          const ry = lerp(atkY, cyScreen, travel);
+          c.strokeStyle = 'rgba(255,91,61,0.5)';
+          c.lineWidth = 8;
+          c.beginPath(); c.moveTo(atkX, atkY); c.lineTo(rx, ry); c.stroke();
+          Render.glowCircle(c, rx, ry, 50, 'rgba(255,80,40,0.6)', 0.4);
+        }
+        if (hit) {
           for (let i = 0; i < 5; i++) {
-            const r = ((t * 200 + i * 60) % 400);
-            c.globalAlpha = 0.4 * (1 - r / 400);
+            const r = ((t * 200 + i * 60) % 300);
+            c.globalAlpha = 0.4 * (1 - r / 300);
             c.strokeStyle = '#ff5b3d';
             c.lineWidth = 4;
             c.beginPath();
@@ -769,66 +829,76 @@ const HUD = (() => {
         break;
       }
       case 'artemis': {
-        // moon + hounds + arrow
+        // Moonlight gathers behind the hunter, not across the whole screen.
         if (p > 0.05) {
-          c.fillStyle = 'rgba(2,10,20,0.35)';
-          c.fillRect(0, 0, GAME_W, GAME_H);
           const mp = clamp((p - 0.05) * 2, 0, 1);
-          Render.glowCircle(c, 1020, 120, 300 * mp, 'rgba(180,255,220,0.4)', 0.5);
+          const moonX = atkX - dir * 120;
+          Render.glowCircle(c, moonX, 120, 150 * mp, 'rgba(180,255,220,0.4)', 0.45);
           c.globalAlpha = 0.7 * mp;
           c.fillStyle = '#dfffe9';
-          c.beginPath(); c.arc(1020, 120, 60 * mp, 0, Math.PI * 2); c.fill();
-          // hounds
-          if (p > 0.25) {
-            for (let i = 0; i < 3; i++) {
-              const hx = cxScreen - 320 + ((t * 500 + i * 90) % 640);
-              const hy = GROUND_Y - 20;
-              c.globalAlpha = 0.55;
-              c.save();
-              c.translate(hx, hy);
-              c.scale(1.4, 1.4);
-              c.fillStyle = '#0a1a12';
-              c.beginPath(); c.ellipse(0, -16, 34, 12, 0, 0, Math.PI * 2); c.fill();
-              c.beginPath(); c.arc(28, -26, 12, 0, Math.PI * 2); c.fill();
-              c.fillStyle = '#a8ffcf';
-              c.beginPath(); c.arc(32, -29, 2.4, 0, Math.PI * 2); c.fill();
-              c.restore();
-            }
-          }
-          // giant arrow
-          if (p > 0.55) {
-            const ap = clamp((p - 0.55) * 4, 0, 1);
-            c.globalAlpha = 0.85;
-            c.strokeStyle = '#dfffe9';
-            c.lineWidth = 6;
-            c.beginPath();
-            c.moveTo(300, 300);
-            c.lineTo(300 + 700 * ap, 300 + 120 * ap);
-            c.stroke();
-            c.fillStyle = '#a8ffcf';
-            c.beginPath();
-            c.moveTo(300 + 700 * ap, 300 + 120 * ap);
-            c.lineTo(300 + 660 * ap, 280 + 120 * ap);
-            c.lineTo(300 + 640 * ap, 330 + 120 * ap);
-            c.fill();
-          }
+          c.beginPath(); c.arc(moonX, 120, 46 * mp, 0, Math.PI * 2); c.fill();
+          c.globalAlpha = 1;
         }
+        // Hounds run from the attacker toward the defender.
+        if (travel > 0.02) {
+          for (let i = 0; i < 3; i++) {
+            const hp = clamp(travel * 1.2 - i * 0.08, 0, 1);
+            const hx = lerp(atkX, cxScreen, hp) + (i - 1) * 46;
+            const hy = GROUND_Y - 20;
+            c.globalAlpha = 0.55;
+            c.save();
+            c.translate(hx, hy);
+            c.scale(1.4, 1.4);
+            c.fillStyle = '#0a1a12';
+            c.beginPath(); c.ellipse(0, -16, 34, 12, 0, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.arc(28, -26, 12, 0, Math.PI * 2); c.fill();
+            c.fillStyle = '#a8ffcf';
+            c.beginPath(); c.arc(32, -29, 2.4, 0, Math.PI * 2); c.fill();
+            c.restore();
+          }
+          c.globalAlpha = 1;
+        }
+        // The giant arrow launches from the attacker's bow.
+        if (travel > 0.15) {
+          const ap = clamp((travel - 0.15) / 0.85, 0, 1);
+          const sx = atkX;
+          const sy = atkY - 20;
+          const tx = lerp(sx, cxScreen, ap);
+          const ty = lerp(sy, cyScreen, ap);
+          c.globalAlpha = 0.85;
+          c.strokeStyle = '#dfffe9';
+          c.lineWidth = 6;
+          c.beginPath();
+          c.moveTo(sx, sy);
+          c.lineTo(tx, ty);
+          c.stroke();
+          c.fillStyle = '#a8ffcf';
+          c.beginPath();
+          c.moveTo(tx, ty);
+          c.lineTo(tx - 34, ty - 18);
+          c.lineTo(tx - 42, ty + 12);
+          c.fill();
+          c.globalAlpha = 1;
+        }
+        if (hit) Render.glowCircle(c, cxScreen, cyScreen, 180, 'rgba(168,255,207,0.7)', 0.5);
         break;
       }
       case 'zeus': {
-        // storm bolts
-        if (p > 0.08) {
-          c.fillStyle = 'rgba(8,14,40,0.4)';
-          c.fillRect(0, 0, GAME_W, GAME_H);
-          for (let i = 0; i < 8; i++) {
-            const bx = 120 + i * 150 + Math.sin(t * 3 + i) * 20;
-            drawLightning(c, bx, 0, bx + Math.sin(t * 2 + i) * 60, GROUND_Y - 120 - (i % 3) * 60, '#bfe9ff', 3 + (i % 3), t + i, 3);
+        // The storm charges over the attacker, then its bolts reach the defender.
+        if (!hit) {
+          Render.glowCircle(c, atkX, atkY - 70, 120 + Math.sin(t * 6) * 10, 'rgba(120,200,255,0.5)', 0.4);
+        }
+        if (travel > 0.02) {
+          for (let i = 0; i < 3; i++) {
+            const sx = atkX - 80 + i * 80;
+            const sy = 0;
+            const tx = lerp(sx, cxScreen + (i - 1) * 30, travel);
+            const ty = lerp(sy, cyScreen + (i - 1) * 40, travel);
+            drawLightning(c, sx, sy, tx, ty, i === 1 ? '#ffffff' : '#bfe9ff', i === 1 ? 12 : 6, t + i, 4);
           }
-          Render.glowCircle(c, cxScreen, cyScreen, 320, 'rgba(120,200,255,0.5)', 0.5);
-          if (p > 0.55) {
-            drawLightning(c, cxScreen + 40, 0, cxScreen, cyScreen + 60, '#ffffff', 26, t * 2, 7);
-            drawLightning(c, cxScreen - 60, 0, cxScreen - 20, cyScreen + 80, '#bfe9ff', 12, t * 2 + 2, 6);
-            Render.glowCircle(c, cxScreen, cyScreen, 380, 'rgba(200,240,255,0.9)', 0.65);
+          if (hit) {
+            drawLightning(c, cxScreen + 40, 0, cxScreen, cyScreen + 60, '#ffffff', 24, t * 2, 7);
+            Render.glowCircle(c, cxScreen, cyScreen, 240, 'rgba(200,240,255,0.9)', 0.55);
           }
         }
         break;

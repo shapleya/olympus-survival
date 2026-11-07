@@ -967,8 +967,9 @@ const Game = {
 
     ctx.restore();
 
-    // cinematic focus
-    Render.drawVignette(ctx, 'rgba(0,0,0,', 0.24);
+    // Cinematics must not dim the arena; keep the normal vignette only during
+    // regular play.
+    if (!this.cinematic) Render.drawVignette(ctx, 'rgba(0,0,0,', 0.24);
 
     // HUD
     HUD.draw(ctx, this);
